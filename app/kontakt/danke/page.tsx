@@ -24,8 +24,10 @@ export default function DankePage() {
           <div
             className="thanks-image"
             role="img"
-            aria-label="Frau am Schreibtisch prüft Unterlagen am Laptop"
-          />
+            aria-label="Dr. Falkenberg prüft Unterlagen"
+          >
+            <img src="/images/danke.png" alt="" />
+          </div>
           <p className="thanks-sub">
             Ich prüfe deine Anfrage und melde mich ehestmöglich bei dir.
           </p>

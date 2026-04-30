@@ -55,15 +55,15 @@ export default function Home() {
           </div>
 
           <div className="hero-portrait" role="img" aria-label="Portrait Dr. Victoria Falkenberg">
-            <div className="ph">Portrait · Platzhalter</div>
+            <img src="/images/hero.png?v=3" alt="Dr. med. Victoria Falkenberg" />
           </div>
         </div>
       </section>
 
       <section className="section" id="ueber-mich" aria-labelledby="b1-h2">
         <div className="row">
-          <div className="row-image tone-sand ratio-16-9" role="img" aria-label="Praxis-Setting (Platzhalter)">
-            <div className="ph-label">Praxis · Platzhalter</div>
+          <div className="row-image ratio-5-4" role="img" aria-label="Dr. Falkenberg an ihrem Arbeitsplatz">
+            <img src="/images/aerztin-aus-ueberzeugung.png" alt="Dr. Falkenberg an ihrem Schreibtisch" />
           </div>
           <div className="row-text">
             <h2 id="b1-h2">Ärztin aus Überzeugung</h2>
@@ -102,8 +102,8 @@ export default function Home() {
 
       <section className="section" aria-labelledby="b3-h2">
         <div className="row reverse">
-          <div className="row-image tone-sage" role="img" aria-label="Aufklärungsarbeit (Platzhalter)">
-            <div className="ph-label">Editorial · Platzhalter</div>
+          <div className="row-image ratio-1-1" role="img" aria-label="Dr. Falkenberg im Behandlungsraum">
+            <img src="/images/aufklaerung-als-herzensthema.png" alt="Dr. Falkenberg mit anatomischem Modell" />
           </div>
           <div className="row-text">
             <h2 id="b3-h2">Aufklärung als Herzensthema</h2>
