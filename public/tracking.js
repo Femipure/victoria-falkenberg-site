@@ -21,15 +21,23 @@
 
   /* ---------------------------------------------------------------- CONFIG */
   var CONFIG = {
-    /* PIXEL-SCHALTER · aktuell AUS (Entscheidung 2026-07-21).
-       Solange dieser Domain Impressum, Datenschutzerklaerung und Consent-Banner
-       fehlen, darf hier kein Marketing-Cookie gesetzt werden. Auf false bleibt
-       grantConsent() wirkungslos – auch wenn ein Banner es versehentlich ruft.
-       Auf true stellen ERST wenn: Impressum live + Datenschutzerklaerung nennt
-       Meta-Pixel und Triple Whale + Consent-Banner ruft grantConsent().
-       EBENE 1 (Parameter-Weitergabe) laeuft davon unabhaengig weiter und
-       braucht keine Cookies – die Funnel-Attribution steht also trotzdem. */
-    PIXELS_ENABLED: false,
+    /* PIXEL-SCHALTER · AN seit 2026-07-21 (Entscheidung des Betreibers).
+       false stellt die Pixel sofort wieder ab: grantConsent() wird dann
+       wirkungslos, auch wenn ein Banner es ruft. EBENE 1 (Parameter-Weitergabe)
+       laeuft unabhaengig davon weiter und braucht keine Cookies. */
+    PIXELS_ENABLED: true,
+
+    /* AUTO_GRANT laedt die Pixel sofort beim Seitenaufruf, ohne auf eine
+       Einwilligung zu warten. Noetig, weil auf diesen Domains noch kein
+       Consent-Banner existiert, das grantConsent() rufen koennte.
+
+       ACHTUNG – das ist der rechtlich heikle Teil, bewusst als eigener
+       Schalter, damit er auffaellt und einzeln zurueckgedreht werden kann:
+       Es werden Marketing-Cookies ohne Einwilligung gesetzt, und die
+       Datenschutzerklaerung nennt die Dienste noch nicht.
+       Sobald ein Banner steht: hier auf false, und das Banner ruft
+       window.fpTracking.grantConsent() im Zustimmungs-Callback. */
+    AUTO_GRANT: true,
 
     META_PIXEL_ID: '996794228712538',    // femipure.de Shop-Pixel — bewusst dasselbe
 
@@ -280,7 +288,9 @@
     config: CONFIG
   };
 
-  /* Kein Consent-Banner installiert? Dann feuert nichts.
-     Sobald Pandectes o. ä. auf der Domain läuft, im Banner-Callback aufrufen:
+  /* Ohne Consent-Banner ruft niemand grantConsent() – deshalb hier direkt,
+     wenn AUTO_GRANT gesetzt ist. Sobald ein Banner steht: AUTO_GRANT auf false
+     und im Zustimmungs-Callback des Banners aufrufen:
          window.fpTracking.grantConsent();                                    */
+  if (CONFIG.AUTO_GRANT) grantConsent();
 })();
