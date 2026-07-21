@@ -188,23 +188,19 @@
     log('meta pixel init', CONFIG.META_PIXEL_ID);
   }
 
-  /* Triple Whale laedt NICHT ueber eine Script-URL, sondern als inline Snippet.
-     Auf femipure.de kommt es aus dem Shopify-App-Block "triple_pixel_snippet"
-     (~1,7 KB, setzt window.TriplePixelData und postet an api.config-security.com).
-     Dieses Snippet ist Shopify-spezifisch (plat:"SHOPIFY", Felder fuer template,
-     collection, cart) und laesst sich nicht sauber auf eine eigene Domain
-     uebertragen — deshalb wird es hier bewusst NICHT einkopiert.
-
-     Zum Aktivieren: in Triple Whale das Snippet fuer eine eigene bzw. headless
-     Domain holen (Settings -> Pixel), hier einsetzen und den TripleName auf
-     CONFIG.TRIPLE_PIXEL_TOKEN setzen.
-
-     Wichtig fuer die Einordnung: die Funnel-Attribution haengt NICHT hieran.
-     Triple Whale liest die Kampagne aus den utm-Parametern, die tracking.js an
-     jeden femipure.de-Link haengt — das Pixel auf der Landing Page liefert nur
-     zusaetzlich die Sicht auf den Vor-Klick-Schritt. */
+  /* Triple Whale hostet den Pixel nicht oeffentlich – er wird als inline
+     Snippet ausgeliefert. Deshalb liegt der Loader als eigene Datei unter
+     /triple-pixel.js (Herkunft und Pflege dort dokumentiert). Sie setzt
+     window.TriplePixelData mit TripleName = CONFIG.TRIPLE_PIXEL_TOKEN und
+     isHeadless:true, weil dies nicht der Shopify-Storefront ist. */
   function loadTriplePixel() {
-    log('TriplePixel nicht installiert – Snippet aus dem TW-Dashboard fehlt noch');
+    if (!CONFIG.TRIPLE_PIXEL_TOKEN) { log('TriplePixel übersprungen – kein Token'); return; }
+    var s = document.createElement('script');
+    s.src = '/triple-pixel.js';
+    s.async = true;
+    s.onerror = function () { log('TriplePixel konnte nicht geladen werden'); };
+    s.onload = function () { log('TriplePixel geladen', window.TriplePixelData); };
+    document.head.appendChild(s);
   }
 
   /* Scroll-Tiefe als Engagement-Signal – nur wenn Pixel geladen ist.
