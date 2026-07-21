@@ -7,7 +7,7 @@
  * Die Rewrites geben ihnen eine redaktionell wirkende URL, ohne dass die
  * Dateien verschoben werden muessen.
  */
-const LANDING_PAGES = ['5-warnzeichen', 'frauen-ab-45'];
+const LANDING_PAGES = ['5-warnzeichen', 'frauen-ab-45', 'tausende-frauen'];
 
 const nextConfig = {
   reactStrictMode: true,
