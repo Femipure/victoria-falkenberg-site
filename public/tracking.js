@@ -1,0 +1,263 @@
+/* ============================================================================
+ * femiPure · Cross-Domain Attribution + Pixel Loader
+ * ----------------------------------------------------------------------------
+ * EIN File für ALLE Persona-Domains (victoriafalkenberg.de, isabellahenning.de,
+ * frauen-gesundheits-check.de …) und ALLE Landing Pages darauf.
+ *
+ * Einbinden mit genau einer Zeile im <head> jeder Seite:
+ *     <script src="/tracking.js" data-lp="vf-tausende-frauen" data-page="FK"></script>
+ *
+ * Zwei Ebenen, bewusst getrennt:
+ *   EBENE 1 (läuft IMMER, ohne Consent) — Parameter aus der URL lesen und beim
+ *           Klick an femipure.de-Links anhängen. Setzt KEINE Cookies, schreibt
+ *           per Default nichts in Storage. Reiner Transport.
+ *   EBENE 2 (läuft NUR nach Consent) — Meta-Pixel + TriplePixel laden.
+ *           Aufruf durch das Consent-Banner:  window.fpTracking.grantConsent()
+ *
+ * Deshalb funktioniert die Attribution auch, wenn der User Cookies ablehnt.
+ * ========================================================================= */
+(function () {
+  'use strict';
+
+  /* ---------------------------------------------------------------- CONFIG */
+  var CONFIG = {
+    META_PIXEL_ID: '996794228712538',    // femipure.de Shop-Pixel — bewusst dasselbe
+    TRIPLE_PIXEL_TOKEN: '',              // TODO: aus Triple Whale Dashboard einsetzen
+    SHOP_HOST_RE: /(^|\.)femipure\.de$/i,
+    USE_SESSION_STORAGE: true,           // false = rein in-memory (0 Storage, 0 Consent-Frage)
+    STORAGE_KEY: 'fp_attr_v1',
+    DEBUG: /[?&]fp_debug=1/.test(location.search)
+  };
+
+  /* Params, die wir über den Domain-Sprung tragen. Reihenfolge = Doku-Reihenfolge. */
+  var KEEP = [
+    'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id',
+    'tw_source', 'tw_adid', 'tw_campaign',
+    'fbclid', 'gclid', 'ttclid',
+    'fp_lp', 'fp_page'
+  ];
+
+  /* ----------------------------------------------------------------- UTILS */
+  function log() {
+    if (CONFIG.DEBUG && window.console) console.log.apply(console, ['[fp-tracking]'].concat([].slice.call(arguments)));
+  }
+
+  function readCookie(name) {
+    var m = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  /* Wo dieses Script eingebunden wurde – liefert data-lp / data-page */
+  function scriptAttrs() {
+    var s = document.currentScript;
+    if (!s) {
+      var all = document.getElementsByTagName('script');
+      for (var i = all.length - 1; i >= 0; i--) {
+        if (/tracking\.js/.test(all[i].src)) { s = all[i]; break; }
+      }
+    }
+    return {
+      lp: s && s.getAttribute('data-lp') || null,
+      page: s && s.getAttribute('data-page') || null
+    };
+  }
+
+  /* --------------------------------------------------- EBENE 1: PARAM-STORE */
+  var store = {};
+
+  function loadStore() {
+    if (!CONFIG.USE_SESSION_STORAGE) return {};
+    try { return JSON.parse(sessionStorage.getItem(CONFIG.STORAGE_KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+
+  function saveStore() {
+    if (!CONFIG.USE_SESSION_STORAGE) return;
+    try { sessionStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(store)); } catch (e) {}
+  }
+
+  function captureParams() {
+    store = loadStore();
+
+    var qs = new URLSearchParams(location.search);
+    KEEP.forEach(function (k) {
+      var v = qs.get(k);
+      if (v) store[k] = v;          // letzter Klick gewinnt (Meta-Empfehlung für fbclid)
+    });
+
+    /* fp_lp / fp_page beschreiben, auf WELCHER Seite der User gerade ist –
+       nicht, woher der Klick kam. Sie duerfen deshalb NIE aus der Session
+       geerbt werden: sonst traegt ein Wechsel von Advertorial A nach B immer
+       noch A's Kennung, und der Verkauf wird der falschen LP gutgeschrieben.
+       Reihenfolge: URL-Param dieser Seite > data-Attribut dieser Seite. */
+    var attrs = scriptAttrs();
+    var urlLp = qs.get('fp_lp'), urlPage = qs.get('fp_page');
+    if (urlLp || attrs.lp) store.fp_lp = urlLp || attrs.lp;
+    if (urlPage || attrs.page) store.fp_page = urlPage || attrs.page;
+
+    saveStore();
+    log('captured', store);
+  }
+
+  /* ------------------------------------------- EBENE 1: LINK-DEKORATION ⭐ */
+  /* Das Herzstück. Hängt beim Klick alle Params an jeden femipure.de-Link.
+     Läuft in der Capture-Phase, damit wir vor jedem anderen Handler dran sind. */
+  function decorate(a) {
+    var dest;
+    try { dest = new URL(a.href, location.href); } catch (e) { return null; }
+    if (!CONFIG.SHOP_HOST_RE.test(dest.hostname)) return null;
+
+    Object.keys(store).forEach(function (k) {
+      if (!dest.searchParams.has(k)) dest.searchParams.set(k, store[k]);
+    });
+
+    /* Meta-Cookies dieser Domain als Rohwerte mitgeben.
+       Wichtig als Fallback: falls der fbclid fehlt (z. B. zweiter Besuch),
+       kann femipure.de daraus trotzdem die Klick-Identität rekonstruieren. */
+    var fbc = readCookie('_fbc'), fbp = readCookie('_fbp');
+    if (fbc && !dest.searchParams.has('fbc')) dest.searchParams.set('fbc', fbc);
+    if (fbp && !dest.searchParams.has('fbp')) dest.searchParams.set('fbp', fbp);
+
+    a.href = dest.toString();
+    return dest;
+  }
+
+  function onClick(e) {
+    var a = e.target && e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    var dest = decorate(a);
+    if (!dest) return;
+
+    log('decorated ->', dest.toString());
+    if (typeof window.fbq === 'function') {
+      window.fbq('trackCustom', 'LP_CTA_Click', {
+        lp: store.fp_lp || null,
+        page: store.fp_page || null,
+        dest: dest.pathname
+      });
+    }
+  }
+
+  /* Zusätzlich: bereits im DOM stehende Links direkt dekorieren.
+     Fängt Fälle ab, in denen der Browser den Klick nicht über uns routet
+     (Mittelklick, "Link in neuem Tab öffnen", Rechtsklick → Adresse kopieren). */
+  function decorateAllNow() {
+    var links = document.querySelectorAll('a[href]');
+    for (var i = 0; i < links.length; i++) decorate(links[i]);
+    log('pre-decorated', links.length, 'links');
+  }
+
+  /* ------------------------------------------------ EBENE 2: PIXEL (Consent) */
+  var pixelsLoaded = false;
+
+  function loadMetaPixel() {
+    if (!CONFIG.META_PIXEL_ID) return;
+    /* Offizieller Meta base code */
+    !function (f, b, e, v, n, t, s) {
+      if (f.fbq) return; n = f.fbq = function () {
+        n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+      };
+      if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = [];
+      t = b.createElement(e); t.async = !0; t.src = v;
+      s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
+    }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+
+    window.fbq('init', CONFIG.META_PIXEL_ID);
+    window.fbq('track', 'PageView');
+    log('meta pixel init', CONFIG.META_PIXEL_ID);
+  }
+
+  function loadTriplePixel() {
+    if (!CONFIG.TRIPLE_PIXEL_TOKEN) { log('TriplePixel übersprungen – kein Token gesetzt'); return; }
+    /* Snippet-Struktur von Triple Whale. Token aus TW-Dashboard → Settings → Pixel.
+       Falls TW ein abweichendes Snippet ausliefert: dieses hier ersetzen. */
+    !function (w, d, t) {
+      var s = d.createElement('script');
+      s.async = !0;
+      s.src = 'https://triplewhale-pixel.web.app/triple-pixel.js?token=' + t;
+      d.head.appendChild(s);
+    }(window, document, CONFIG.TRIPLE_PIXEL_TOKEN);
+    log('triple pixel init');
+  }
+
+  /* Scroll-Tiefe als Engagement-Signal – nur wenn Pixel geladen ist.
+     ACHTUNG: manche Advertorials brechen auf Shopify per Vollbild-Overlay aus
+     dem Theme aus (position:fixed; inset:0; overflow-y:auto). Dann scrollt NICHT
+     das Fenster, sondern dieser Container – ein window-Listener feuert dort nie.
+     Deshalb wird der echte Scroll-Container gesucht. */
+  function scrollContainer() {
+    var els = document.querySelectorAll('body > div, body > main');
+    for (var i = 0; i < els.length; i++) {
+      var cs = getComputedStyle(els[i]);
+      if (cs.position === 'fixed' &&
+          (cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
+          els[i].scrollHeight > els[i].clientHeight + 50) {
+        return els[i];
+      }
+    }
+    return null;
+  }
+
+  function trackScrollDepth() {
+    var fired = {};
+    var box = scrollContainer();
+    var target = box || window;
+    log('scroll-container:', box ? '#' + box.id : 'window');
+
+    function check() {
+      var pct = box
+        ? (box.scrollTop + box.clientHeight) / box.scrollHeight * 100
+        : (document.documentElement.scrollTop + window.innerHeight) /
+          document.documentElement.scrollHeight * 100;
+
+      [50, 75].forEach(function (mark) {
+        if (pct >= mark && !fired[mark]) {
+          fired[mark] = true;
+          if (typeof window.fbq === 'function') {
+            window.fbq('trackCustom', 'LP_Scroll_' + mark, { lp: store.fp_lp || null });
+          }
+        }
+      });
+      if (fired[50] && fired[75]) target.removeEventListener('scroll', check);
+    }
+    target.addEventListener('scroll', check, { passive: true });
+  }
+
+  function grantConsent() {
+    if (pixelsLoaded) return;
+    pixelsLoaded = true;
+    loadMetaPixel();
+    loadTriplePixel();
+    trackScrollDepth();
+  }
+
+  /* -------------------------------------------------------------- BOOTSTRAP */
+  captureParams();
+
+  document.addEventListener('click', onClick, true);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', decorateAllNow);
+  } else {
+    decorateAllNow();
+  }
+  /* Nachladende Inhalte (React-Rerender, Lazy-Sections) erneut abdecken */
+  if (window.MutationObserver) {
+    var mo = new MutationObserver(function () { decorateAllNow(); });
+    document.addEventListener('DOMContentLoaded', function () {
+      mo.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+
+  /* Öffentliche API – das Consent-Banner ruft grantConsent() auf */
+  window.fpTracking = {
+    grantConsent: grantConsent,
+    getParams: function () { return JSON.parse(JSON.stringify(store)); },
+    decorateAll: decorateAllNow,
+    config: CONFIG
+  };
+
+  /* Kein Consent-Banner installiert? Dann feuert nichts.
+     Sobald Pandectes o. ä. auf der Domain läuft, im Banner-Callback aufrufen:
+         window.fpTracking.grantConsent();                                    */
+})();
