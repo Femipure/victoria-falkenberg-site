@@ -21,8 +21,21 @@
 
   /* ---------------------------------------------------------------- CONFIG */
   var CONFIG = {
+    /* PIXEL-SCHALTER · aktuell AUS (Entscheidung 2026-07-21).
+       Solange dieser Domain Impressum, Datenschutzerklaerung und Consent-Banner
+       fehlen, darf hier kein Marketing-Cookie gesetzt werden. Auf false bleibt
+       grantConsent() wirkungslos – auch wenn ein Banner es versehentlich ruft.
+       Auf true stellen ERST wenn: Impressum live + Datenschutzerklaerung nennt
+       Meta-Pixel und Triple Whale + Consent-Banner ruft grantConsent().
+       EBENE 1 (Parameter-Weitergabe) laeuft davon unabhaengig weiter und
+       braucht keine Cookies – die Funnel-Attribution steht also trotzdem. */
+    PIXELS_ENABLED: false,
+
     META_PIXEL_ID: '996794228712538',    // femipure.de Shop-Pixel — bewusst dasselbe
-    TRIPLE_PIXEL_TOKEN: '',              // TODO: aus Triple Whale Dashboard einsetzen
+
+    /* Triple Whale identifiziert den Shop ueber die myshopify-Domain. Verifiziert
+       am 2026-07-21 aus window.TriplePixelData auf femipure.de (TripleName). */
+    TRIPLE_PIXEL_TOKEN: '071zuf-tj.myshopify.com',
     SHOP_HOST_RE: /(^|\.)femipure\.de$/i,
     USE_SESSION_STORAGE: true,           // false = rein in-memory (0 Storage, 0 Consent-Frage)
     STORAGE_KEY: 'fp_attr_v1',
@@ -167,17 +180,23 @@
     log('meta pixel init', CONFIG.META_PIXEL_ID);
   }
 
+  /* Triple Whale laedt NICHT ueber eine Script-URL, sondern als inline Snippet.
+     Auf femipure.de kommt es aus dem Shopify-App-Block "triple_pixel_snippet"
+     (~1,7 KB, setzt window.TriplePixelData und postet an api.config-security.com).
+     Dieses Snippet ist Shopify-spezifisch (plat:"SHOPIFY", Felder fuer template,
+     collection, cart) und laesst sich nicht sauber auf eine eigene Domain
+     uebertragen — deshalb wird es hier bewusst NICHT einkopiert.
+
+     Zum Aktivieren: in Triple Whale das Snippet fuer eine eigene bzw. headless
+     Domain holen (Settings -> Pixel), hier einsetzen und den TripleName auf
+     CONFIG.TRIPLE_PIXEL_TOKEN setzen.
+
+     Wichtig fuer die Einordnung: die Funnel-Attribution haengt NICHT hieran.
+     Triple Whale liest die Kampagne aus den utm-Parametern, die tracking.js an
+     jeden femipure.de-Link haengt — das Pixel auf der Landing Page liefert nur
+     zusaetzlich die Sicht auf den Vor-Klick-Schritt. */
   function loadTriplePixel() {
-    if (!CONFIG.TRIPLE_PIXEL_TOKEN) { log('TriplePixel übersprungen – kein Token gesetzt'); return; }
-    /* Snippet-Struktur von Triple Whale. Token aus TW-Dashboard → Settings → Pixel.
-       Falls TW ein abweichendes Snippet ausliefert: dieses hier ersetzen. */
-    !function (w, d, t) {
-      var s = d.createElement('script');
-      s.async = !0;
-      s.src = 'https://triplewhale-pixel.web.app/triple-pixel.js?token=' + t;
-      d.head.appendChild(s);
-    }(window, document, CONFIG.TRIPLE_PIXEL_TOKEN);
-    log('triple pixel init');
+    log('TriplePixel nicht installiert – Snippet aus dem TW-Dashboard fehlt noch');
   }
 
   /* Scroll-Tiefe als Engagement-Signal – nur wenn Pixel geladen ist.
@@ -224,6 +243,10 @@
   }
 
   function grantConsent() {
+    if (!CONFIG.PIXELS_ENABLED) {
+      log('grantConsent ignoriert – PIXELS_ENABLED ist false');
+      return;
+    }
     if (pixelsLoaded) return;
     pixelsLoaded = true;
     loadMetaPixel();
