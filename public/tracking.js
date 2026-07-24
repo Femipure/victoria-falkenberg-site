@@ -97,10 +97,33 @@
     try { sessionStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(store)); } catch (e) {}
   }
 
+  /* Ein '#' im Kampagnennamen (z.B. utm_campaign=FK_#NK6) ist fuer den Browser
+     das Fragment-Zeichen: alles ab dem '#' – inklusive fbclid und utm_content –
+     faellt in location.hash statt in location.search und ist damit fuer die
+     Attribution verloren. Symptom in Triple Whale: (not set) plus Sales, die der
+     falschen Ad zugeschlagen werden, weil alle #-Kampagnen zu 'FK_' kollabieren.
+
+     Diese Funktion setzt den zerbrochenen Query-String wieder zusammen. Sie
+     greift NUR, wenn der Hash wie abgeschnittene Attribution-Parameter aussieht
+     (enthaelt fbclid/gclid/ttclid/utm_/tw_) – ein echter Sprungmarken-Anker wie
+     #product-card bleibt unangetastet. Im heilen Fall (kein Fragment) ist sie
+     ein No-Op. Mehrere '#' werden korrekt behandelt, weil sie beim
+     Wieder-Zusammensetzen zu Literalen im Parameter-Wert werden. */
+  function recoveredParams() {
+    var hash = location.hash;
+    if (hash.length > 1 &&
+        /(?:^|&)(fbclid|gclid|ttclid|utm_[a-z]+|tw_[a-z]+)=/.test(hash.slice(1))) {
+      var rebuilt = location.search.slice(1) + '#' + hash.slice(1);
+      log('URL am # zerbrochen – rekonstruiere:', rebuilt);
+      return new URLSearchParams(rebuilt);
+    }
+    return new URLSearchParams(location.search);
+  }
+
   function captureParams() {
     store = loadStore();
 
-    var qs = new URLSearchParams(location.search);
+    var qs = recoveredParams();
     KEEP.forEach(function (k) {
       var v = qs.get(k);
       if (v) store[k] = v;          // letzter Klick gewinnt (Meta-Empfehlung für fbclid)
