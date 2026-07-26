@@ -211,19 +211,28 @@
     log('meta pixel init', CONFIG.META_PIXEL_ID);
   }
 
-  /* Triple Whale hostet den Pixel nicht oeffentlich – er wird als inline
-     Snippet ausgeliefert. Deshalb liegt der Loader als eigene Datei unter
-     /triple-pixel.js (Herkunft und Pflege dort dokumentiert). Sie setzt
-     window.TriplePixelData mit TripleName = CONFIG.TRIPLE_PIXEL_TOKEN und
-     isHeadless:true, weil dies nicht der Shopify-Storefront ist. */
+  /* TriplePixel auf der Landing Page ABGESCHALTET (2026-07-26). WARUM:
+     Triple Whale identifiziert Besucher ueber eine ID im localStorage – und
+     localStorage ist pro Domain getrennt. Gemessen am 2026-07-26:
+        victoriafalkenberg.de -> tw-id ms1l36az_0.l02er3ufuu
+        femipure.de           -> tw-id ms1l3njf_0.n1p0h9hiibk  (voellig andere)
+     Der LP-Pixel meldet also eine Session mit einer ID, die es auf femipure.de
+     nicht gibt. Beim Klick in den Shop bekommt derselbe Besucher dort eine neue
+     ID. Triple Whale sieht zwei unverbundene Besucher und kann die LP-Session
+     (mit der Ad-Info) nicht mit der Shop-Session (mit der Order) verketten ->
+     die Order landet in (not set). TW's Cross-Domain-Verkettung braucht eine
+     Klick-ID in der URL, die nur das offizielle headless-Snippet mitgibt; unser
+     nachgebauter Loader kann das prinzipiell nicht.
+
+     Die Order-Attribution laeuft ohne diesen Pixel sauber: der native
+     TriplePixel auf femipure.de liest die durchgereichten utm/fbclid aus der
+     Shop-URL (der Fragment-Fix sorgt fuer einen intakten fbclid). DAS ist der
+     korrekte Weg fuer Advertorial-Funnels.
+
+     Wieder-Aktivieren nur mit dem offiziellen TW-Snippet fuer eigene/headless
+     Domains (Settings -> Pixel) statt unserem Nachbau. */
   function loadTriplePixel() {
-    if (!CONFIG.TRIPLE_PIXEL_TOKEN) { log('TriplePixel übersprungen – kein Token'); return; }
-    var s = document.createElement('script');
-    s.src = '/triple-pixel.js';
-    s.async = true;
-    s.onerror = function () { log('TriplePixel konnte nicht geladen werden'); };
-    s.onload = function () { log('TriplePixel geladen', window.TriplePixelData); };
-    document.head.appendChild(s);
+    log('TriplePixel auf LP bewusst deaktiviert – Attribution laeuft ueber den Shop-Pixel');
   }
 
   /* Scroll-Tiefe als Engagement-Signal – nur wenn Pixel geladen ist.
