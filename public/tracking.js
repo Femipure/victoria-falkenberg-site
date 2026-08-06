@@ -50,13 +50,14 @@
     DEBUG: /[?&]fp_debug=1/.test(location.search)
   };
 
-  /* Params, die wir über den Domain-Sprung tragen. Reihenfolge = Doku-Reihenfolge. */
-  var KEEP = [
-    'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id',
-    'tw_source', 'tw_adid', 'tw_campaign',
-    'fbclid', 'gclid', 'ttclid',
-    'fp_lp', 'fp_page'
-  ];
+  /* Triple Whale leitet die Kampagne/Ad-Set/Ad-Hierarchie aus den UTM-Parametern
+     der Session ab (nicht primaer aus dem fbclid). Fehlt beim Domain-Sprung auch
+     nur eine Ebene, kann TW die Order nicht ins Ad-Set einsortieren -> sie landet
+     als lose Zeile / (not set). Deshalb reichen wir NICHT mehr nur eine feste
+     Liste durch, sondern JEDEN eingehenden Query-Parameter (ausser den internen
+     unten) - so kommt der komplette Meta-Query-String lueckenlos an femipure.de
+     an, inkl. Ebenen, die wir nicht namentlich kennen. */
+  var BLOCK = ['fp_debug', 'fp_lp', 'fp_page'];   // intern bzw. seiten-spezifisch behandelt
 
   /* ----------------------------------------------------------------- UTILS */
   function log() {
@@ -124,9 +125,8 @@
     store = loadStore();
 
     var qs = recoveredParams();
-    KEEP.forEach(function (k) {
-      var v = qs.get(k);
-      if (v) store[k] = v;          // letzter Klick gewinnt (Meta-Empfehlung für fbclid)
+    qs.forEach(function (v, k) {     // JEDEN Param uebernehmen (letzter Klick gewinnt)
+      if (v && BLOCK.indexOf(k) === -1) store[k] = v;
     });
 
     /* fp_lp / fp_page beschreiben, auf WELCHER Seite der User gerade ist –
